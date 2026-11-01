@@ -1,6 +1,3 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
-
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -41,6 +38,7 @@ function validateTargetUrl(value) {
 }
 
 async function fetchHtml(url) {
+  const axios = require('axios');
   const response = await axios.get(url, {
     timeout: 12000,
     maxRedirects: 5,
@@ -188,6 +186,7 @@ function extractParts($) {
 }
 
 function parseCatalogPage(html, url, isHome) {
+  const cheerio = require('cheerio');
   const $ = cheerio.load(html);
   const title = ($('h1').first().text() || $('title').first().text() || '')
     .replace(/\s+/g, ' ')
