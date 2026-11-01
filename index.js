@@ -188,6 +188,10 @@ function parseCatalogPage(html, url, isHome) {
 }
 
 exports.handler = async function (event) {
+  const startedAt = Date.now();
+  let stage = 'read_request';
+  let action = 'unknown';
+  let targetUrl = '';
   const method = event.httpMethod || event.httpMethodName || 'GET';
 
   if (method === 'OPTIONS') {
@@ -198,20 +202,26 @@ exports.handler = async function (event) {
   }
 
   const params = event.queryStringParameters || {};
-  const action = params.action || (params.url ? 'page' : 'home');
+  action = params.action || (params.url ? 'page' : 'home');
 
   try {
     if (action === 'home') {
-      const html = await fetchHtml('https://www.catcar.info/');
-      return jsonResponse(200, parseCatalogPage(html, 'https://www.catcar.info/', true));
+      targetUrl = 'https://www.catcar.info/';
+      stage = 'fetch_catcar_home';
+      const html = await fetchHtml(targetUrl);
+      stage = 'parse_catcar_home';
+      return jsonResponse(200, parseCatalogPage(html, targetUrl, true));
     }
 
     if (action === 'page') {
       if (!params.url) {
         return jsonResponse(400, { success: false, error: 'Missing url parameter' });
       }
-      const targetUrl = validateTargetUrl(params.url);
+      stage = 'validate_target_url';
+      targetUrl = validateTargetUrl(params.url);
+      stage = 'fetch_catcar_page';
       const html = await fetchHtml(targetUrl);
+      stage = 'parse_catcar_page';
       return jsonResponse(200, parseCatalogPage(html, targetUrl, false));
     }
 
@@ -227,10 +237,26 @@ exports.handler = async function (event) {
       'Target host is not allowed',
       'Credentials and custom ports are not allowed'
     ].includes(message);
+    const upstream = error && error.response ? error.response : null;
+    const diagnostic = {
+      stage,
+      action,
+      target: targetUrl ? new URL(targetUrl).host : null,
+      error_name: error && error.name ? String(error.name) : 'Error',
+      error_code: error && error.code ? String(error.code) : null,
+      error_message: String(message).slice(0, 500),
+      upstream_status: upstream && upstream.status ? upstream.status : null,
+      upstream_status_text: upstream && upstream.statusText ? String(upstream.statusText).slice(0, 200) : null,
+      redirect_location: upstream && upstream.headers && upstream.headers.location
+        ? String(upstream.headers.location).slice(0, 500)
+        : null,
+      elapsed_ms: Date.now() - startedAt
+    };
 
     return jsonResponse(validationError ? 400 : 502, {
       success: false,
-      error: validationError ? message : 'CatCar request failed: ' + message
+      error: validationError ? message : 'CatCar request failed: ' + message,
+      diagnostic
     });
   }
 };
