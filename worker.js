@@ -34,8 +34,15 @@ function htmlText(value) {
     .replace(/<style\b[\s\S]*?<\/style>/gi, " ").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ")).trim();
 }
 function getAttribute(tag, name) {
-  const match = String(tag || "").match(new RegExp("\\b" + name + "\\s*=\\s*(?:\\"([^\\"]*)\\"|'([^']*)'|([^\\s>]+))", "i"));
-  return match ? decodeEntities(match[1] ?? match[2] ?? match[3] ?? "") : "";
+  const source = String(tag || "");
+  const attributes = source.matchAll(/([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g);
+  for (const item of attributes) {
+    if (item[1].toLowerCase() === name.toLowerCase()) {
+      return decodeEntities(item[2] ?? item[3] ?? item[4] ?? "");
+    }
+  }
+  return "";
+}
 }
 async function fetchHtml(initialUrl) {
   let currentUrl = initialUrl;
