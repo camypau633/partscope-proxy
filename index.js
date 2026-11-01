@@ -81,7 +81,10 @@ function extractNavigation($, baseUrl, isHome) {
   $('a[href]').each((_, element) => {
     const anchor = $(element);
     const href = String(anchor.attr('href') || '').trim();
-    const label = (anchor.text().trim() || anchor.attr('title') || anchor.find('img').attr('alt') || '')
+    const rowLabel = anchor.closest('tr').find('th,td').map((__, cell) =>
+      $(cell).text().replace(/\s+/g, ' ').trim()
+    ).get().filter(Boolean).join(' · ');
+    const label = (rowLabel || anchor.text().trim() || anchor.attr('title') || anchor.find('img').attr('alt') || '')
       .replace(/\s+/g, ' ')
       .trim();
     const url = absoluteCatCarLink(href, baseUrl);
@@ -148,19 +151,28 @@ function extractParts($) {
       if (!cleanedOem || seen.has(cleanedOem)) return;
       seen.add(cleanedOem);
 
-      let pos = '';
-      let name = '';
-      for (let previous = index - 1; previous >= Math.max(0, index - 4); previous -= 1) {
-        const candidate = rows[previous].cells;
-        if (candidate.length >= 2 && /^\d{3,6}$/.test(candidate[0]) && candidate[1]) {
-          pos = candidate[0];
-          name = candidate[1];
-          break;
+      // CatCar's parts table places position, OEM and description in the same row.
+      // Keep a fallback for layouts where these values are split across nearby rows.
+      let pos = /^\d{1,4}$/.test(row.cells[0] || '') ? row.cells[0] : '';
+      let name = row.cells[2] || '';
+
+      if (!pos || !name) {
+        for (let previous = index - 1; previous >= Math.max(0, index - 4); previous -= 1) {
+          const candidate = rows[previous].cells;
+          if (!pos && candidate.length >= 2 && /^\d{1,4}$/.test(candidate[0]) && candidate[1]) {
+            pos = candidate[0];
+          }
+          if (!name && candidate.length >= 3 && candidate[2]) {
+            name = candidate[2];
+          } else if (!name && candidate.length >= 2 && candidate[1]) {
+            name = candidate[1];
+          }
+          if (pos && name) break;
         }
       }
 
       if (!name && row.cells.length > 1) {
-        name = row.cells.slice(1).join(' ').trim();
+        name = row.cells.slice(1).filter((cell) => cell !== rawOem).join(' ').trim();
       }
 
       parts.push({
