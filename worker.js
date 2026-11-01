@@ -26,8 +26,15 @@ function decodeEntities(value) {
   return String(value || "").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
     .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
+    .replace(/&#(\\d+);|&#x([0-9a-f]+);/gi, (entity, decimal, hexadecimal) => {
+      const codePoint = decimal ? Number(decimal) : parseInt(hexadecimal, 16);
+      try {
+        return Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff
+          ? String.fromCodePoint(codePoint) : entity;
+      } catch {
+        return entity;
+      }
+    });
 }
 function htmlText(value) {
   return decodeEntities(String(value || "").replace(/<script\b[\s\S]*?<\/script>/gi, " ")
@@ -86,8 +93,12 @@ function extractNavigation(html, baseUrl, isHome) {
     const anchorHtml = match[0];
     const openingTag = anchorHtml.match(/^<a\b[^>]*>/i)?.[0] || "";
     const href = getAttribute(openingTag, "href").trim();
-    const rowHtml = anchorHtml.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/i)?.[0] || "";
-    const cells = rowHtml.match(/<(?:th|td)\b[^>]*>[\s\S]*?<\/(?:th|td)>/gi) || [];
+    const rowStart = html.lastIndexOf("<tr", match.index);
+    const previousRowEnd = html.lastIndexOf("</tr>", match.index);
+    const rowEnd = html.indexOf("</tr>", match.index);
+    const rowHtml = rowStart > previousRowEnd && rowEnd !== -1
+      ? html.slice(rowStart, rowEnd + 5) : "";
+    const cells = rowHtml.match(/<(?:th|td)\\b[^>]*>[\\s\\S]*?<\\/(?:th|td)>/gi) || [];
     const rowLabel = cells.map(htmlText).filter(Boolean).join(" · ");
     const imageTag = anchorHtml.match(/<img\b[^>]*>/i)?.[0] || "";
     const label = (rowLabel || htmlText(anchorHtml) || getAttribute(openingTag, "title") || getAttribute(imageTag, "alt")).replace(/\s+/g, " ").trim();
