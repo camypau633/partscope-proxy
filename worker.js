@@ -43,7 +43,6 @@ function getAttribute(tag, name) {
   }
   return "";
 }
-}
 async function fetchHtml(initialUrl) {
   let currentUrl = initialUrl;
   for (let redirects = 0; redirects <= 5; redirects += 1) {
