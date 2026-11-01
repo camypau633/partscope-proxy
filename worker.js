@@ -98,7 +98,7 @@ function extractNavigation(html, baseUrl, isHome) {
     const rowEnd = html.indexOf("</tr>", match.index);
     const rowHtml = rowStart > previousRowEnd && rowEnd !== -1
       ? html.slice(rowStart, rowEnd + 5) : "";
-    const cells = rowHtml.match(/<(?:th|td)\\b[^>]*>[\\s\\S]*?<\\/(?:th|td)>/gi) || [];
+    const cells = rowHtml.match(/<(?:th|td)\b[^>]*>[\s\S]*?<\/(?:th|td)>/gi) || [];
     const rowLabel = cells.map(htmlText).filter(Boolean).join(" · ");
     const imageTag = anchorHtml.match(/<img\b[^>]*>/i)?.[0] || "";
     const label = (rowLabel || htmlText(anchorHtml) || getAttribute(openingTag, "title") || getAttribute(imageTag, "alt")).replace(/\s+/g, " ").trim();
