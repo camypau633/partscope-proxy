@@ -43,7 +43,15 @@ function validateTargetUrl(value) {
 async function fetchHtml(url) {
   const response = await axios.get(url, {
     timeout: 12000,
-    maxRedirects: 0,
+    maxRedirects: 5,
+    beforeRedirect: (options) => {
+      const protocol = String(options.protocol || '');
+      const hostname = String(options.hostname || options.host || '').toLowerCase();
+      const port = String(options.port || '');
+      if (protocol !== 'https:' || !['catcar.info', 'www.catcar.info'].includes(hostname) || (port && port !== '443')) {
+        throw new Error('CatCar redirected to a non-allowed address');
+      }
+    },
     maxContentLength: 5 * 1024 * 1024,
     maxBodyLength: 5 * 1024 * 1024,
     responseType: 'text',
@@ -74,7 +82,7 @@ function extractNavigation($, baseUrl, isHome) {
     const anchor = $(element);
     const href = String(anchor.attr('href') || '').trim();
     const label = (anchor.text().trim() || anchor.attr('title') || anchor.find('img').attr('alt') || '')
-      .replace(/\\s+/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
     const url = absoluteCatCarLink(href, baseUrl);
     if (!url || !label) return;
@@ -82,7 +90,7 @@ function extractNavigation($, baseUrl, isHome) {
     const parsed = new URL(url);
     const base = new URL(baseUrl);
     const hasCatalogState = parsed.searchParams.has('l');
-    const isBrandPath = /^\\/[a-z0-9_-]+\\/?$/i.test(parsed.pathname) && parsed.pathname !== '/';
+    const isBrandPath = /^\/[a-z0-9_-]+\/?$/i.test(parsed.pathname) && parsed.pathname !== '/';
 
     if (isHome) {
       if (!isBrandPath) return;
@@ -90,7 +98,7 @@ function extractNavigation($, baseUrl, isHome) {
       return;
     }
 
-    if (/^(русский|english|подключить каталоги|2026 catcar\\.info)$/i.test(label)) return;
+    if (/^(русский|english|подключить каталоги|2026 catcar\.info)$/i.test(label)) return;
     if (url === baseUrl) return;
     if (!found.has(url)) found.set(url, { label, url });
   });
@@ -108,7 +116,7 @@ function extractSchemeImage($, baseUrl) {
     try {
       const parsed = new URL(raw, baseUrl);
       if (!/^https?:$/.test(parsed.protocol)) return;
-      if (/\\.(png|jpe?g|gif|webp)(?:$|[?#])/i.test(parsed.href) &&
+      if (/\.(png|jpe?g|gif|webp)(?:$|[?#])/i.test(parsed.href) &&
           (parsed.hostname === 'ci.catcar.info' || parsed.hostname.endsWith('.catcar.info'))) {
         image = parsed.toString();
       }
@@ -123,14 +131,14 @@ function extractParts($) {
   const rows = [];
   $('tr').each((_, element) => {
     const cells = $(element).find('th,td').map((__, cell) =>
-      $(cell).text().replace(/\\s+/g, ' ').trim()
+      $(cell).text().replace(/\s+/g, ' ').trim()
     ).get();
-    rows.push({ text: $(element).text().replace(/\\s+/g, ' ').trim(), cells });
+    rows.push({ text: $(element).text().replace(/\s+/g, ' ').trim(), cells });
   });
 
   const parts = [];
   const seen = new Set();
-  const oemPattern = /\\b(?:[A-Z0-9]{2,}-[A-Z0-9-]{2,}|[A-Z]{1,3}\\d{4,}[A-Z0-9]*)\\b/gi;
+  const oemPattern = /\b(?:[A-Z0-9]{2,}-[A-Z0-9-]{2,}|[A-Z]{1,3}\d{4,}[A-Z0-9]*)\b/gi;
 
   rows.forEach((row, index) => {
     const matches = row.text.match(oemPattern) || [];
@@ -144,7 +152,7 @@ function extractParts($) {
       let name = '';
       for (let previous = index - 1; previous >= Math.max(0, index - 4); previous -= 1) {
         const candidate = rows[previous].cells;
-        if (candidate.length >= 2 && /^\\d{3,6}$/.test(candidate[0]) && candidate[1]) {
+        if (candidate.length >= 2 && /^\d{3,6}$/.test(candidate[0]) && candidate[1]) {
           pos = candidate[0];
           name = candidate[1];
           break;
@@ -159,7 +167,7 @@ function extractParts($) {
         cleaned_oem: cleanedOem,
         raw_oem: rawOem,
         pos: pos || '—',
-        name: (name || 'Деталь').replace(/\\s+/g, ' ').trim()
+        name: (name || 'Деталь').replace(/\s+/g, ' ').trim()
       });
     });
   });
@@ -170,7 +178,7 @@ function extractParts($) {
 function parseCatalogPage(html, url, isHome) {
   const $ = cheerio.load(html);
   const title = ($('h1').first().text() || $('title').first().text() || '')
-    .replace(/\\s+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 
   const items = extractNavigation($, url, isHome);
