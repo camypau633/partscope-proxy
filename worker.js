@@ -26,7 +26,7 @@ function decodeEntities(value) {
   return String(value || "").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
     .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
-    .replace(/&#(\\d+);|&#x([0-9a-f]+);/gi, (entity, decimal, hexadecimal) => {
+    .replace(/&#(\d+);|&#x([0-9a-f]+);/gi, (entity, decimal, hexadecimal) => {
       const codePoint = decimal ? Number(decimal) : parseInt(hexadecimal, 16);
       try {
         return Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff
