@@ -65,8 +65,21 @@ async function fetchHtml(initialUrl) {
       continue;
     }
     if (!response.ok) {
+      const diagnosticHeaders = {};
+      for (const name of ["content-type", "server", "cf-ray", "via", "date", "location", "cf-cache-status", "x-cache", "x-powered-by"]) {
+        const value = response.headers.get(name);
+        if (value) diagnosticHeaders[name] = value.slice(0, 300);
+      }
+      let bodyExcerpt = "";
+      try {
+        bodyExcerpt = (await response.text()).replace(/\\s+/g, " ").trim().slice(0, 500);
+      } catch (readError) {
+        bodyExcerpt = "Could not read error response body: " + String(readError && readError.message || readError).slice(0, 200);
+      }
       const error = new Error("CatCar returned HTTP " + response.status);
       error.upstreamStatus = response.status;
+      error.upstreamHeaders = diagnosticHeaders;
+      error.upstreamBodyExcerpt = bodyExcerpt;
       throw error;
     }
     const contentType = response.headers.get("content-type") || "";
@@ -211,6 +224,8 @@ export default {
           error_name: error && error.name ? String(error.name) : "Error",
           error_message: String(message).slice(0, 500),
           upstream_status: error && error.upstreamStatus ? error.upstreamStatus : null,
+          upstream_headers: error && error.upstreamHeaders ? error.upstreamHeaders : null,
+          upstream_body_excerpt: error && error.upstreamBodyExcerpt ? error.upstreamBodyExcerpt : null,
           elapsed_ms: Date.now() - startedAt
         }
       });
